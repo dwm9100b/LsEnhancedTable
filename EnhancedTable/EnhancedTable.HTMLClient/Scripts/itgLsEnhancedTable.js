@@ -1,4 +1,5 @@
-﻿/// <reference path="lodash.js" />
+﻿/// <reference path="msls-2.5.0.js" />
+/// <reference path="lodash.js" />
 
 
 // Check to see if the Itg namespace exists
@@ -222,8 +223,8 @@ var itgLs = itgLs || {};
             var propertyType = tableColumn.valueModel.propertyType;
 
             filter.dataType = propertyType.__isPrimitiveType
-                ? propertyType.name
-                : propertyType.underlyingType.name;
+                ? propertyType.id
+                : propertyType.underlyingType.id;
 
             // Add the pointer style to the header element
             $(filter.element).css('cursor', 'pointer');
@@ -275,43 +276,39 @@ var itgLs = itgLs || {};
             var operators;
             var defaultValueIndex = 0;
 
-            switch (filter.dataType) {
+			if (filter.dataType.indexOf(":String") != -1) {
 
-                case "String":
-                    defaultValueIndex = 2;
-                    operators = [
-                        { stringValue: "Is equal to", value: "eq" },
-                        { stringValue: "Is not equal to", value: "ne" },
-                        { stringValue: "Starts with", value: "startswith" },
-                        { stringValue: "Contains", value: "substringof" },
-                        { stringValue: "Does not contain", value: "not substringof" },
-                        { stringValue: "Ends with", value: "endswith" }
-                    ];
-                    break;
+				defaultValueIndex = 2;
+				operators = [
+					{ stringValue: "Is equal to", value: "eq" },
+					{ stringValue: "Is not equal to", value: "ne" },
+					{ stringValue: "Starts with", value: "startswith" },
+					{ stringValue: "Contains", value: "substringof" },
+					{ stringValue: "Does not contain", value: "not substringof" },
+					{ stringValue: "Ends with", value: "endswith" }
+				];
 
-                case "DateTime":
-                case "Date":
-                    operators = [
-                        { stringValue: "Is equal to", value: "eq" },
-                        { stringValue: "Is not equal to", value: "ne" },
-                        { stringValue: "Is after or equal to", value: "ge" },
-                        { stringValue: "Is after", value: "gt" },
-                        { stringValue: "Is before or equal to", value: "le" },
-                        { stringValue: "Is before", value: "lt" }
-                    ];
-                    break;
+			} else if (filter.dataType.indexOf(":Date") != -1) {
+				operators = [
+					{ stringValue: "Is equal to", value: "eq" },
+					{ stringValue: "Is not equal to", value: "ne" },
+					{ stringValue: "Is after or equal to", value: "ge" },
+					{ stringValue: "Is after", value: "gt" },
+					{ stringValue: "Is before or equal to", value: "le" },
+					{ stringValue: "Is before", value: "lt" }
+				];
 
-                default:
-                    operators = [
-                        { stringValue: "Is equal to", value: "eq" },
-                        { stringValue: "Is not equal to", value: "ne" },
-                        { stringValue: "Is greater than or equal to", value: "ge" },
-                        { stringValue: "Is greater than", value: "gt" },
-                        { stringValue: "Is less than or equal to", value: "le" },
-                        { stringValue: "Is less than", value: "lt" }
-                    ];
-                    break;
-            }
+			} else {
+				operators = [
+					{ stringValue: "Is equal to", value: "eq" },
+					{ stringValue: "Is not equal to", value: "ne" },
+					{ stringValue: "Is greater than or equal to", value: "ge" },
+					{ stringValue: "Is greater than", value: "gt" },
+					{ stringValue: "Is less than or equal to", value: "le" },
+					{ stringValue: "Is less than", value: "lt" }
+				];
+
+			}
 
             for (var i = 0; i < operatorContentItems.length; i++) {
             	var defaultValue = operators[defaultValueIndex].value;
@@ -454,9 +451,9 @@ var itgLs = itgLs || {};
                     formatString = getFilterFormatString(item.operator, filter.dataType);
 
                 	// If this is a date data type, we need to preprocess the value for transport
-                    if (filter.dataType == 'Date' || filter.dataType == 'DateTime') {
+                    if (filter.dataType.indexOf(":Date") != -1) {
 
-                        tempValue = new Date(tempValue).format('yyyy-MM-dd');
+                        tempValue = new Date(tempValue);
 
                     };
 
@@ -464,7 +461,7 @@ var itgLs = itgLs || {};
                     if (filterString.length > 0) filterString += filter.concatType + " ";
 
                     // Add format to the filter and add to our bigger item
-                    filterString += String.format(formatString, dataField, item.operator, getODataString(filter.dataType, tempValue));
+                    filterString += String.format(formatString, dataField, item.operator, msls._toODataString(tempValue, filter.dataType));
 
                 });
 
@@ -478,78 +475,39 @@ var itgLs = itgLs || {};
         // ==========================================================================================
         function getFilterFormatString(operator, dataType) {
 
-            var result;
+        	var result;
 
-            switch (dataType) {
-                case "String":
+			if (dataType.indexOf(":String") != -1) {
+				switch (operator) {
+					case "substringof":
+						result = "{1}({2}, {0}) ";
+						break;
 
-                    switch (operator) {
-                        case "substringof":
-                            result = "{1}({2}, {0}) ";
-                            break;
+					case "not substringof":
+						result = "{1}({2}, {0}) ";
+						break;
 
-                        case "not substringof":
-                            result = "{1}({2}, {0}) ";
-                            break;
+					case "startswith":
+						result = "{1}({0}, {2}) ";
+						break;
 
-                        case "startswith":
-                            result = "{1}({0}, {2}) ";
-                            break;
+					case "endswith":
+						result = "{1}({0}, {2}) ";
+						break;
 
-                        case "endswith":
-                            result = "{1}({0}, {2}) ";
-                            break;
+					default:
+						result = "{0} {1} {2} ";
+						break;
+				}
 
-                        default:
-                            result = "{0} {1} {2} ";
-                            break;
-                    }
-                    break;
-
-                default:
-                    result = "{0} {1} {2} ";
-                    break;
-
-            }
+			} else {
+				result = "{0} {1} {2} ";
+			}
 
             return result;
 
         };
 
-        // Escape out & and ' from a string for transport
-        // ==========================================================================================
-        function escapeString(string) {
-
-            // Escape out single quotes
-            string = string.replace(/'/g, '\'');
-            
-            // Escape out any ampersands &
-            string = string.replace(/&/g, '%26');
-
-            return string;
-
-        };
-
-        // Get a formatted odata string for a single piece of data based on its type
-        // ==========================================================================================
-        function getODataString(dataType, data) {
-
-            var oDataFormatters = {
-                DateTime: function (value) { return "DATETIME'" + value + "'"; },
-                Date: function (value) { return "DATETIME'" + value + "'"; },
-                Decimal: function (value) { return value + "M"; },
-                Single: function (value) { return value + "f"; },
-                Int64: function (value) { return value + "L"; },
-                Int32: function (value) { return value; },
-                Int16: function (value) { return value; },
-                String: function (value) { return "'" + escapeString(value) + "'"; }
-            };
-
-            return oDataFormatters[dataType]
-                ? oDataFormatters[dataType](data)
-                : "Unsupported Type";
-
-        }
 
 
         // ///////////////////////////////////////////////////////////////////////////////////////////
@@ -842,7 +800,7 @@ var itgLs = itgLs || {};
 })(window.jQuery, window._);
 
 
-(function($, _) {
+(function($) {
 
 	// Make sure our ui space is there
 	// ==========================================================================================
@@ -893,4 +851,4 @@ var itgLs = itgLs || {};
 	};
 
 // Pass in our jquery and lo-dash objects
-})(window.jQuery, window._);
+})(window.jQuery);
