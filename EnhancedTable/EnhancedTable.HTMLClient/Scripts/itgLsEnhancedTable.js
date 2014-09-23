@@ -166,8 +166,8 @@ var itgLs = itgLs || {};
 
                 // Now replace the parent html with our new elements
                 $(this).html("");
-                $(this).append(tableColumn.enhancedTable.sort.element);
                 $(this).append(tableColumn.enhancedTable.filter.element);
+                $(this).append(tableColumn.enhancedTable.sort.element);
 
                 // This property will hold which direction we are sorting, ASC, DESC, NULL
                 tableColumn.enhancedTable.sort.direction = null;
