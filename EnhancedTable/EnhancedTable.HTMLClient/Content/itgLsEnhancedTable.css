@@ -4,6 +4,8 @@
 
 .itgls-sort-element {
     float: left;
+    word-wrap: break-word;
+    overflow: hidden;
 }
 
 .itgls-filter-icon-element {

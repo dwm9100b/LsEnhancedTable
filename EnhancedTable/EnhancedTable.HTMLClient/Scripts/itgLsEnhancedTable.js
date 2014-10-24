@@ -54,7 +54,8 @@ var itgLs = itgLs || {};
             visualCollection: options.contentItem._binding.value,
 
             // Get the name of this controls data source, ie database name
-            dataSourceName: options.contentItem.model.dataSource.member.source.target.source.member.id.split('/')[0],
+            dataSourceName: (options.contentItem.model.dataSource.member.source.target.source.member) ?
+                options.contentItem.model.dataSource.member.source.target.source.member.id.split('/')[0] : "",
 
             // Get the name of the data table associated with this control
             dataTableName: options.contentItem.details._entry.name,
@@ -77,10 +78,60 @@ var itgLs = itgLs || {};
 
             // Update our query method for our dynamic sorting, only need to do this on initialize
             // ==========================================================================================
-            options.contentItem.details._entry.simpleDescriptor.createQuery =
-                function () {
-                    return this.dataWorkspace[properties.dataSourceName][properties.dataTableName].filter(properties.filterString).orderBy(properties.sortString);
-                };
+            if (options.contentItem.details._entry.simpleDescriptor.createQuery) {
+                // is parent table
+                options.contentItem.details._entry.simpleDescriptor.createQuery =
+                    function () {
+                        return this.dataWorkspace[properties.dataSourceName][properties.dataTableName].filter(properties.filterString).orderBy(properties.sortString);
+                    };
+            }
+
+            if (options.contentItem.details._entry.simpleDescriptor.appendQuery) {
+                // is child table with set relationship
+                options.contentItem.details._entry.simpleDescriptor.appendQuery =
+                    function () {
+                        var toReturn = this;
+
+                        if (properties.filterString) {
+                            toReturn = toReturn.filter(properties.filterString);
+                        }
+
+                        if (properties.sortString) {
+                            var useThenBy = false;
+                            properties.sortString.split(',').forEach(function (entry) {
+                                var sortParms = entry.trim().split(' ');
+                                if (sortParms.length == 2) {
+                                    if (sortParms[1] === 'desc') {
+                                        if (!useThenBy) {
+                                            toReturn = toReturn.orderByDescending(sortParms[0]);
+                                            useThenBy = true;
+                                        } else {
+                                            toReturn = toReturn.thenByDescending(sortParms[0]);
+                                        }
+                                    } else {
+                                        if (!useThenBy) {
+                                            toReturn = toReturn.orderBy(sortParms[0]);
+                                            useThenBy = true;
+                                        } else {
+                                            toReturn = toReturn.thenBy(sortParms[0]);
+                                        }
+                                    }
+                                }
+
+                                if (sortParms.length == 1) {
+                                    if (!useThenBy) {
+                                        toReturn = toReturn.orderBy(sortParms[0]);
+                                        useThenBy = true;
+                                    } else {
+                                        toReturn = toReturn.thenBy(sortParms[0]);
+                                    }
+                                }
+                            });
+                        }
+                        return toReturn;
+                    };
+            }
+
 
 
             // Find and loop over each TH (header) element
@@ -115,8 +166,8 @@ var itgLs = itgLs || {};
 
                 // Now replace the parent html with our new elements
                 $(this).html("");
-                $(this).append(tableColumn.enhancedTable.sort.element);
                 $(this).append(tableColumn.enhancedTable.filter.element);
+                $(this).append(tableColumn.enhancedTable.sort.element);
 
                 // This property will hold which direction we are sorting, ASC, DESC, NULL
                 tableColumn.enhancedTable.sort.direction = null;
